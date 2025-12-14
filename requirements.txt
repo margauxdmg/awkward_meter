@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+requests
+python-dotenv
+openai
+gradium
+jinja2
+websockets

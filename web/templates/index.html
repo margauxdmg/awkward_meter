@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWKWARD.METER _</title>
+    <link rel="stylesheet" href="/static/style.css?v=4">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="overlay"></div>
+
+    <div class="main-container">
+        <header>
+            <div class="logo">AWKWARD.METER <span class="blink">_</span></div>
+            <div class="status">SYSTEM: <span id="sys-status">READY</span></div>
+        </header>
+
+        <!-- STEP 1: UPLOAD -->
+        <div id="upload-section" class="glass-panel">
+            <h2 class="section-title">DROP AUDIO EVIDENCE</h2>
+            <div class="drop-zone" id="drop-zone">
+                <div class="icon-pulse"></div>
+                <p>.WAV .MP3 .M4A</p>
+                <input type="file" id="file-input" hidden accept=".wav,.mp3,.m4a">
+            </div>
+        </div>
+
+        <!-- LOADING SCREEN -->
+        <div id="loading-screen" class="hidden">
+            <div class="scanner-line"></div>
+            <h3>ANALYZING AUDIO DNA...</h3>
+            <p id="loading-text">Extracting conversational patterns...</p>
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+
+        <!-- STEP 2: IDENTITY -->
+        <div id="identity-section" class="glass-panel hidden">
+            <h2 class="section-title">SUBJECT IDENTIFICATION</h2>
+            <p class="section-subtitle">Listen to voice samples and identify the speakers.</p>
+            
+            <div class="speakers-grid" id="speakers-grid">
+                <!-- Injected via JS -->
+            </div>
+
+            <button class="action-btn" id="btn-analyze">GENERATE FINAL REPORT >></button>
+        </div>
+
+        <!-- STEP 3: REPORT -->
+        <div id="report-section" class="glass-panel hidden">
+            <div class="score-card">
+                <div class="score-circle">
+                    <svg viewBox="0 0 36 36" class="circular-chart orange">
+                        <path class="circle-bg"
+                          d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                        />
+                        <path class="circle" id="score-ring"
+                          stroke-dasharray="0, 100"
+                          d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                        />
+                        <text x="18" y="20.35" class="percentage" id="score-val">0</text>
+                        <text x="18" y="25" class="percentage" style="font-size: 0.25em; fill: #666;">/ 100</text>
+                    </svg>
+                </div>
+                <div class="verdict-container">
+                    <h3>VERDICT</h3>
+                    <h1 id="verdict-text">ANALYZING...</h1>
+                </div>
+            </div>
+
+            <!-- ANALYTICS DASHBOARD -->
+            <div class="analytics-dashboard">
+                <h3 class="dash-title">CONVERSATION DYNAMICS</h3>
+                
+                <div class="metrics-grid-4">
+                    <!-- 1. Dominance -->
+                    <div class="metric-box" id="box-dominance">
+                        <h4>DOMINANCE</h4>
+                        <div class="metric-visual bar-chart-container" id="dominance-chart"></div>
+                        <p class="metric-comment" id="dominance-comment">Analyzing...</p>
+                    </div>
+
+                    <!-- 2. Interruptions -->
+                    <div class="metric-box" id="box-interruptions">
+                        <h4>INTERRUPTIONS</h4>
+                        <div class="metric-big-num" id="interruptions-val">0</div>
+                        <p class="metric-comment" id="interruptions-comment">Analyzing...</p>
+                    </div>
+
+                    <!-- 3. Silence -->
+                    <div class="metric-box" id="box-silence">
+                        <h4>SILENCE</h4>
+                        <div class="metric-big-num" id="silence-val">0s</div>
+                        <p class="metric-sub">Avg Gap</p>
+                        <p class="metric-comment" id="silence-comment">Analyzing...</p>
+                    </div>
+
+                    <!-- 4. Quality -->
+                    <div class="metric-box" id="box-quality">
+                        <h4>ENGAGEMENT</h4>
+                        <div class="metric-stats">
+                            <div><span id="questions-val">0</span> Questions</div>
+                            <div><span id="wpt-val">0</span> Words/Turn</div>
+                        </div>
+                        <p class="metric-comment" id="quality-comment">Analyzing...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACTION PLAN -->
+            <div class="action-plan-section">
+                <h3 class="dash-title">CORRECTIVE ACTION PLAN</h3>
+                <div class="action-list" id="action-plan-list">
+                    <!-- Injected via JS -->
+                </div>
+            </div>
+
+            <!-- TIMELINE -->
+            <div class="timeline-container">
+                <h3 class="dash-title">TRANSCRIPT LOG</h3>
+                <div class="timeline-scroll" id="timeline"></div>
+            </div>
+            
+            <button class="action-btn" onclick="location.reload()" style="margin-top: 20px;">NEW ANALYSIS</button>
+        </div>
+    </div>
+
+    <script src="/static/script.js?v=4"></script>
+</body>
+</html>
