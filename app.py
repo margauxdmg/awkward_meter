@@ -418,8 +418,8 @@ async def analyze_with_names(job_id: str = Form(...), speaker_map: str = Form(..
 @app.post("/generate_coach_audio")
 async def generate_coach_audio(
     job_id: str = Form(...), 
-    trigger_speaker: str = Form(...), 
-    trigger_text: str = Form(...),
+    trigger_speaker: str = Form(""), 
+    trigger_text: str = Form(""),
     response_speaker: str = Form(...),
     response_text: str = Form(...)
 ):
@@ -427,15 +427,24 @@ async def generate_coach_audio(
         return JSONResponse({"error": "Gradium API Key not configured"}, status_code=500)
     
     async def generate_single_clip(spk_name, text):
+        spk_name = (spk_name or "").strip()
+        text = (text or "").strip()
+
+        if not spk_name:
+            return None, "Missing speaker id"
+        if not text:
+            return None, "Missing text"
+
         # Find sample (assuming spk_name is the ID like SPEAKER_00)
         sample_path = os.path.join(SAMPLES_DIR, f"{job_id}_{spk_name}.wav")
         if not os.path.exists(sample_path):
             print(f"Sample not found for {spk_name} at {sample_path}")
-            return None
+            return None, f"Sample not found: {sample_path}"
         
         # Clone
         voice_uid = gradium_tts.clone_voice(sample_path, spk_name)
-        if not voice_uid: return None
+        if not voice_uid:
+            return None, "Voice cloning failed"
         
         # Generate
         text_hash = hashlib.md5(text.encode()).hexdigest()[:8]
@@ -443,19 +452,28 @@ async def generate_coach_audio(
         output_path = os.path.join(SAMPLES_DIR, output_filename)
         
         # Generate
-        success = await gradium_tts.generate_audio_async(text, voice_uid, output_path)
+        success, err = await gradium_tts.generate_audio_async(text, voice_uid, output_path)
         
         if success:
-            return f"{SAMPLES_URL_PREFIX}/{output_filename}"
-        return None
+            return f"{SAMPLES_URL_PREFIX}/{output_filename}", None
+        return None, err or "Unknown TTS error"
 
     # Generate both clips concurrently
     # Note: Trigger speaker and Response speaker are passed as IDs (SPEAKER_00) from frontend
     
+    response_speaker = (response_speaker or "").strip()
+    response_text = (response_text or "").strip()
+
+    if not response_speaker or not response_text:
+        return JSONResponse(
+            {"error": "Missing response speaker or response text"},
+            status_code=400
+        )
+
     print(f"Generating audio sequence. Trigger: {trigger_speaker} says '{trigger_text}'. Response: {response_speaker} says '{response_text}'")
     
-    url_trigger = await generate_single_clip(trigger_speaker, trigger_text)
-    url_response = await generate_single_clip(response_speaker, response_text)
+    url_trigger, err_trigger = await generate_single_clip(trigger_speaker, trigger_text)
+    url_response, err_response = await generate_single_clip(response_speaker, response_text)
     
     if url_trigger and url_response:
         return JSONResponse({
@@ -467,7 +485,13 @@ async def generate_coach_audio(
             "playlist": [url_response]
         })
     else:
-        return JSONResponse({"error": "TTS Generation failed"}, status_code=500)
+        return JSONResponse({
+            "error": "TTS Generation failed",
+            "details": {
+                "trigger": {"speaker": trigger_speaker, "text": trigger_text, "error": err_trigger},
+                "response": {"speaker": response_speaker, "text": response_text, "error": err_response},
+            }
+        }, status_code=500)
 
 if __name__ == "__main__":
     import uvicorn

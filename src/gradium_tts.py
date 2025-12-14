@@ -48,7 +48,7 @@ class GradiumTTS:
             print(f"[Gradium] Exception: {e}")
             return None
 
-    async def generate_audio_async(self, text: str, voice_uid: str, output_path: str) -> bool:
+    async def generate_audio_async(self, text: str, voice_uid: str, output_path: str):
         """
         Connects to WebSocket, sends text, receives audio chunks, and saves to WAV.
         """
@@ -74,7 +74,7 @@ class GradiumTTS:
                         break
                     if data.get("type") == "error":
                         print(f"[Gradium] Setup Error: {data}")
-                        return False
+                        return False, data
                 
                 # 2. Send Text
                 text_msg = {
@@ -106,7 +106,7 @@ class GradiumTTS:
                         
                     elif msg_type == "error":
                         print(f"[Gradium] Stream Error: {data}")
-                        return False
+                        return False, data
                 
                 # 5. Save to file
                 if audio_chunks:
@@ -114,11 +114,11 @@ class GradiumTTS:
                         for chunk in audio_chunks:
                             f.write(chunk)
                     print(f"[Gradium] Audio saved to {output_path}")
-                    return True
+                    return True, None
                 else:
                     print("[Gradium] No audio received.")
-                    return False
+                    return False, {"type": "error", "message": "No audio received from TTS stream"}
                     
         except Exception as e:
             print(f"[Gradium] WebSocket Exception: {e}")
-            return False
+            return False, {"type": "exception", "message": str(e)}
