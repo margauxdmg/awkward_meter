@@ -13,6 +13,17 @@ let currentSpeakers = [];
 let speakerIdMap = {}; // Maps Name -> Original ID (e.g. "Margaux" -> "SPEAKER_01")
 let globalMainUser = null; // Store the selected main user name
 
+// Debug: show backend health/version in console (helps confirm deploy + routing)
+(async () => {
+  try {
+    const r = await fetch('/__health');
+    const txt = await r.text();
+    console.log('[__health]', r.status, txt);
+  } catch (e) {
+    console.warn('[__health] failed', e);
+  }
+})();
+
 // Drag & Drop
 dropZone.addEventListener('click', () => fileInput.click());
 dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#00f2ff'; });

@@ -23,6 +23,9 @@ load_dotenv()
 
 app = FastAPI()
 
+# Version/debug info (helps verify which deployment is live on Vercel)
+APP_VERSION = (os.getenv("VERCEL_GIT_COMMIT_SHA") or os.getenv("VERCEL_GIT_COMMIT_REF") or "local")[:12]
+
 # --- Paths (work locally + on Vercel) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IS_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
@@ -61,6 +64,17 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Store intermediate results in memory
 SESSION_STORE = {}
+
+@app.get("/__health")
+async def health():
+    return {
+        "ok": True,
+        "version": APP_VERSION,
+        "is_vercel": IS_VERCEL,
+        "upload_dir": UPLOAD_DIR,
+        "samples_dir": SAMPLES_DIR,
+        "samples_url_prefix": SAMPLES_URL_PREFIX,
+    }
 
 def extract_speaker_samples(audio_path: str, segments: list, job_id: str):
     """
