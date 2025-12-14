@@ -65,6 +65,73 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 # Store intermediate results in memory
 SESSION_STORE = {}
 
+def _session_file_path(job_id: str) -> str:
+    return os.path.join(UPLOAD_DIR, f"session_{job_id}.json")
+
+def _serialize_segments(segments: list[Segment]) -> list[dict]:
+    return [
+        {
+            "start": float(s.start),
+            "end": float(s.end),
+            "speaker": s.speaker,
+            "text": s.text or "",
+            "is_question": bool(getattr(s, "is_question", False)),
+        }
+        for s in segments
+    ]
+
+def _deserialize_segments(payload: list[dict]) -> list[Segment]:
+    out: list[Segment] = []
+    for d in payload or []:
+        out.append(
+            Segment(
+                start=float(d.get("start", 0.0)),
+                end=float(d.get("end", 0.0)),
+                speaker=str(d.get("speaker", "Unknown")),
+                text=str(d.get("text", "")),
+                is_question=bool(d.get("is_question", False)),
+            )
+        )
+    return out
+
+def save_session(job_id: str, file_path: str, segments: list[Segment], original_name: str):
+    """Persist session to disk so reloads/serverless cold starts don't lose job state."""
+    try:
+        data = {
+            "job_id": job_id,
+            "file_path": file_path,
+            "original_name": original_name,
+            "segments": _serialize_segments(segments),
+        }
+        with open(_session_file_path(job_id), "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception as e:
+        # Non-fatal: keep working in-memory
+        print(f"[Session] Warning: failed to persist session {job_id}: {e}")
+
+def load_session(job_id: str):
+    """Load session from memory or disk."""
+    if job_id in SESSION_STORE:
+        return SESSION_STORE[job_id]
+
+    path = _session_file_path(job_id)
+    if not os.path.exists(path):
+        return None
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        session = {
+            "file_path": data.get("file_path"),
+            "segments": _deserialize_segments(data.get("segments", [])),
+            "original_name": data.get("original_name", ""),
+        }
+        SESSION_STORE[job_id] = session
+        return session
+    except Exception as e:
+        print(f"[Session] Failed to load session {job_id}: {e}")
+        return None
+
 @app.get("/__health")
 async def health():
     return {
@@ -239,6 +306,7 @@ async def process_upload(file: UploadFile = File(...)):
             "segments": segments,
             "original_name": file.filename
         }
+        save_session(job_id, file_path, segments, file.filename)
         speakers = list(samples.keys())
         return JSONResponse({
             "job_id": job_id,
@@ -252,7 +320,7 @@ async def process_upload(file: UploadFile = File(...)):
 @app.post("/analyze")
 async def analyze_with_names(job_id: str = Form(...), speaker_map: str = Form(...), main_user_name: str = Form(None)):
     try:
-        session = SESSION_STORE.get(job_id)
+        session = load_session(job_id)
         if not session:
             return JSONResponse({"error": "Session expired or not found"}, status_code=404)
             
