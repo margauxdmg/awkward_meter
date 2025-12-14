@@ -33,7 +33,14 @@ async function handleFile(file) {
 
     try {
         const response = await fetch('/upload', { method: 'POST', body: formData });
-        const data = await response.json();
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok) {
+            const txt = await response.text();
+            throw new Error(`HTTP ${response.status}: ${txt.slice(0, 200)}`);
+        }
+        const data = contentType.includes('application/json')
+          ? await response.json()
+          : (() => { throw new Error('Server did not return JSON.'); })();
         
         loadingScreen.classList.add('hidden');
         if (data.error) throw new Error(data.error);
@@ -108,7 +115,14 @@ btnAnalyze.addEventListener('click', async () => {
 
     try {
         const response = await fetch('/analyze', { method: 'POST', body: formData });
-        const data = await response.json();
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok) {
+            const txt = await response.text();
+            throw new Error(`HTTP ${response.status}: ${txt.slice(0, 200)}`);
+        }
+        const data = contentType.includes('application/json')
+          ? await response.json()
+          : (() => { throw new Error('Server did not return JSON.'); })();
         
         loadingScreen.classList.add('hidden');
         if (data.error) throw new Error(data.error);
@@ -348,7 +362,14 @@ async function playCoachAudio(btn) {
     
     try {
         const response = await fetch('/generate_coach_audio', { method: 'POST', body: formData });
-        const data = await response.json();
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok) {
+            const txt = await response.text();
+            throw new Error(`HTTP ${response.status}: ${txt.slice(0, 200)}`);
+        }
+        const data = contentType.includes('application/json')
+          ? await response.json()
+          : (() => { throw new Error('Server did not return JSON.'); })();
         
         if (data.error) throw new Error(data.error);
         if (!data.playlist || data.playlist.length === 0) throw new Error("No audio generated.");
