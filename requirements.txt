@@ -7,3 +7,4 @@ openai
 gradium
 jinja2
 websockets
+pydub
