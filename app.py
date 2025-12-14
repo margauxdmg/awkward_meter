@@ -3,6 +3,9 @@ import shutil
 import wave
 import json
 import uuid
+import tempfile
+import subprocess
+import hashlib
 from typing import Dict
 from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.staticfiles import StaticFiles
@@ -20,15 +23,29 @@ load_dotenv()
 
 app = FastAPI()
 
-# Directories
-UPLOAD_DIR = "temp_uploads"
-SAMPLES_DIR = "web/static/samples"
+# --- Paths (work locally + on Vercel) ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IS_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+
+# Writable dirs: Vercel guarantees /tmp
+if IS_VERCEL:
+    UPLOAD_DIR = os.path.join(tempfile.gettempdir(), "awkward_meter_uploads")
+    SAMPLES_DIR = os.path.join(tempfile.gettempdir(), "awkward_meter_samples")
+    SAMPLES_URL_PREFIX = "/samples"
+else:
+    UPLOAD_DIR = os.path.join(BASE_DIR, "temp_uploads")
+    SAMPLES_DIR = os.path.join(BASE_DIR, "web", "static", "samples")
+    SAMPLES_URL_PREFIX = "/static/samples"
+
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(SAMPLES_DIR, exist_ok=True)
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="web/static"), name="static")
-templates = Jinja2Templates(directory="web/templates")
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "web", "static")), name="static")
+# Serve generated audio clips even if stored in /tmp (Vercel)
+app.mount(SAMPLES_URL_PREFIX, StaticFiles(directory=SAMPLES_DIR), name="samples")
+
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "web", "templates"))
 
 # Initialize Pipeline
 pyannote_key = os.getenv("PYANNOTE_API_KEY")
@@ -50,8 +67,19 @@ def extract_speaker_samples(audio_path: str, segments: list, job_id: str):
     Extracts a 3-5 second sample for each speaker from the WAV file.
     """
     wav_path = os.path.join(UPLOAD_DIR, f"{job_id}_converted.wav")
-    if not os.path.exists(wav_path):
-        os.system(f"afconvert -f WAVE -d LEI16@24000 -c 1 '{audio_path}' '{wav_path}'")
+    ext = os.path.splitext(audio_path)[1].lower()
+
+    # If the upload is already WAV, use it directly
+    if ext == ".wav":
+        wav_path = audio_path
+    else:
+        # On macOS local we can convert using afconvert; on Vercel (Linux) this won't exist.
+        if shutil.which("afconvert"):
+            if not os.path.exists(wav_path):
+                cmd = ["afconvert", "-f", "WAVE", "-d", "LEI16@24000", "-c", "1", audio_path, wav_path]
+                subprocess.run(cmd, check=True, capture_output=True)
+        else:
+            raise Exception("Server cannot convert this audio format. Please upload a .wav file.")
 
     samples_map = {}
     found_speakers = set(s.speaker for s in segments)
@@ -81,9 +109,10 @@ def extract_speaker_samples(audio_path: str, segments: list, job_id: str):
                     dest.setframerate(framerate)
                     dest.writeframes(audio_data)
                 
-                samples_map[spk] = f"/static/samples/{sample_filename}"
+                samples_map[spk] = f"{SAMPLES_URL_PREFIX}/{sample_filename}"
     
-    if os.path.exists(wav_path):
+    # Only delete if we created a converted file
+    if wav_path != audio_path and os.path.exists(wav_path):
         os.remove(wav_path)
         
     return samples_map
@@ -372,8 +401,6 @@ async def analyze_with_names(job_id: str = Form(...), speaker_map: str = Form(..
         print(f"Error: {e}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
-import hashlib
-
 @app.post("/generate_coach_audio")
 async def generate_coach_audio(
     job_id: str = Form(...), 
@@ -403,7 +430,10 @@ async def generate_coach_audio(
         
         # Generate
         success = await gradium_tts.generate_audio_async(text, voice_uid, output_path)
-        return f"/static/samples/{output_filename}" if success else None
+        
+        if success:
+            return f"{SAMPLES_URL_PREFIX}/{output_filename}"
+        return None
 
     # Generate both clips concurrently
     # Note: Trigger speaker and Response speaker are passed as IDs (SPEAKER_00) from frontend
